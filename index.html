@@ -147,6 +147,7 @@
     const lobbyEvents = [];
     let currentGame = null;
     const LOBBY_MESSAGE_TYPES = new Set(["L", "G", "I", "A"]);
+    const GAME_MESSAGE_TYPES = new Set(["H", "S", "K", "C", "M"]);
 
     function setConnectionStatus(text, state) {
       $connectionStatus.text(text);
@@ -503,9 +504,18 @@
     conn.onMove((moveMsg, rawMsg) => {
       if (!moveMsg || !moveMsg.t) return;
       const packetChannel = rawMsg?.packet?.channel ?? 0;
+      const from = rawMsg?.packet?.from ?? moveMsg.from ?? moveMsg.id;
 
       if (packetChannel === lobbyChannelIndex && LOBBY_MESSAGE_TYPES.has(moveMsg.t)) {
         handleLobbyMessage(moveMsg, rawMsg);
+        return;
+      }
+
+      if (GAME_MESSAGE_TYPES.has(moveMsg.t) && opponentNodeId == null) {
+        return;
+      }
+
+      if (GAME_MESSAGE_TYPES.has(moveMsg.t) && from != null && opponentNodeId != null && (from >>> 0) !== opponentNodeId) {
         return;
       }
 
