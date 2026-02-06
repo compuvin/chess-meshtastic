@@ -25,9 +25,14 @@ export class ChessMeshtastic {
 
     this.myNodeNum = null;
     this.loggedMyNodeNum = false;
+    this.myShortName = null;
+    this.nodeInfoByNum = new Map();
+    this.channelsByIndex = new Map();
     this.configId = Math.floor(Math.random() * 0xffff);
     this.heartbeatTimer = null;
     this.onMoveCallback = null;
+    this.onChannelCallback = null;
+    this.onNodeInfoCallback = null;
     this.rxBuffer = new Uint8Array(0);
     this.maxFrameSize = 1024 * 64;
     this.framingByte1 = 148;
@@ -57,6 +62,13 @@ export class ChessMeshtastic {
   }
 
   async sendMove(moveObj) {
+    return this.sendPayload(moveObj, {
+      destination: this.opponentNodeId ?? 0xffffffff,
+      channel: 0
+    });
+  }
+
+  async sendPayload(payloadObj, options = {}) {
     if (!this.connected) {
       console.warn("[CHESS] Not connected to Meshtastic");
       return;
@@ -66,7 +78,8 @@ export class ChessMeshtastic {
     }
 
     try {
-      const json = JSON.stringify(moveObj);
+      const { destination = 0xffffffff, channel = 0 } = options;
+      const json = JSON.stringify(payloadObj);
       const payloadBytes = new TextEncoder().encode(json);
 
       const data = this.Data.create({
@@ -76,8 +89,8 @@ export class ChessMeshtastic {
       });
 
       const meshPacketFields = {
-        to: this.opponentNodeId ?? 0xffffffff,
-        channel: 0,
+        to: destination,
+        channel,
         id: this._nextPacketId(),
         wantAck: true,
         priority: 70,
@@ -95,7 +108,7 @@ export class ChessMeshtastic {
       const framed = this._framePacket(buffer);
 
       await this.writer.write(framed);
-      console.log("[CHESS TX]", moveObj);
+      console.log("[CHESS TX]", payloadObj);
     } catch (err) {
       console.error("[CHESS TX ERROR]", err);
       throw err;
@@ -104,6 +117,14 @@ export class ChessMeshtastic {
 
   onMove(callback) {
     this.onMoveCallback = callback;
+  }
+
+  onChannel(callback) {
+    this.onChannelCallback = callback;
+  }
+
+  onNodeInfo(callback) {
+    this.onNodeInfoCallback = callback;
   }
 
   async disconnect() {
@@ -241,6 +262,32 @@ export class ChessMeshtastic {
         }
       }
 
+      if (msg.nodeInfo) {
+        const nodeNum = msg.nodeInfo.num;
+        if (nodeNum != null) {
+          this.nodeInfoByNum.set(nodeNum, msg.nodeInfo);
+          if (this.myNodeNum != null && nodeNum === this.myNodeNum) {
+            const shortName = msg.nodeInfo.user?.shortName;
+            if (shortName) {
+              this.myShortName = shortName;
+            }
+          }
+          if (this.onNodeInfoCallback) {
+            this.onNodeInfoCallback(msg.nodeInfo);
+          }
+        }
+      }
+
+      if (msg.channel) {
+        const channelIndex = msg.channel.index;
+        if (channelIndex != null) {
+          this.channelsByIndex.set(channelIndex, msg.channel);
+          if (this.onChannelCallback) {
+            this.onChannelCallback(msg.channel);
+          }
+        }
+      }
+
       const decoded = msg?.packet?.decoded;
       if (!decoded) return;
 
@@ -263,8 +310,7 @@ export class ChessMeshtastic {
         return;
       }
 
-      if (this.gameId != null && parsed.g !== this.gameId) return;
-
+      console.log("[CHESS RX]", parsed);
       if (this.onMoveCallback) {
         this.onMoveCallback(parsed, msg);
       }

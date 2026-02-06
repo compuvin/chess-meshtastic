@@ -5,38 +5,97 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Meshtastic Chess</title>
 
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css">
+  <link rel="stylesheet" href="lib/chessboard-1.0.0.min.css" onerror="this.onerror=null;this.href='https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css';">
+  <script>
+    function loadCdnScript(url, el) {
+      if (el && el.dataset && el.dataset.cdnLoaded) return;
+      const script = document.createElement('script');
+      script.src = url;
+      if (el && el.defer) script.defer = true;
+      if (el && el.async) script.async = true;
+      if (el) {
+        el.dataset.cdnLoaded = "true";
+        el.parentNode.insertBefore(script, el.nextSibling);
+      } else {
+        document.head.appendChild(script);
+      }
+    }
+  </script>
   <style>
     body { font-family: Arial, sans-serif; display:flex; flex-direction:column; align-items:center; padding-top:20px; }
     #board { width: 420px; }
     #connectionStatus { font-weight:bold; margin-bottom:10px; }
     #gameStatus { font-size:1.1em; font-weight:bold; margin-top:8px; }
     #connectionAlert { margin-top:6px; font-weight:bold; color:#b00020; }
+    #lobbyList { width: 420px; margin-top: 10px; }
+    #lobbyList ul { list-style: none; padding: 0; margin: 0; }
+    #lobbyList li { display:flex; justify-content:space-between; align-items:center; padding: 6px 8px; border: 1px solid #ddd; margin-bottom: 6px; }
+    #lobbyList li.inactive { color: #8a8a8a; }
+    #lobbyQr { margin-top: 10px; text-align: center; }
+    #lobbyQr img { width: 220px; height: 220px; }
     button { margin: 0 6px; }
   </style>
 </head>
 <body>
   <h1>Meshtastic Web Chess</h1>
-  <div id="board"></div>
-
   <div style="margin: 16px 0;">
-    <button id="connectBtn">🔌 Connect Meshtastic Radio</button>
+    <button id="connectSerialBtn">🔌 Connect Serial</button>
+    <button id="connectBleBtn">📶 Connect Bluetooth</button>
     <button id="disconnectBtn" disabled>🛑 Disconnect</button>
   </div>
-  <div style="margin: 8px 0;">
+  <div id="opponentNodeWrap" style="margin: 8px 0; display:none;">
     <label for="opponentNodeId">Opponent Node ID:</label>
     <input id="opponentNodeId" type="text" placeholder="e.g. 0x49308818 or !49308818" style="margin-left:6px; width: 220px;" />
   </div>
 
   <div id="connectionStatus">Status: Disconnected</div>
-  <div id="playerColorStatus"></div>
-  <div id="connectionAlert"></div>
-  <div id="gameStatus"></div>
-  <p><button id="resetBtn">Reset Game</button></p>
+  <div id="lobbyView">
+    <div id="lobbyStatus"></div>
+    <div id="lobbyQr" style="display:none;">
+      <div>GameLobby channel not found. Scan to add:</div>
+      <img src="img/GameLobby.png" alt="GameLobby channel QR code" />
+      <div style="margin-top:6px;">
+        Channel: <code>GameLobby</code><br />
+        PSK: <code>OpLah30Ci9oMvUDbXRGVcw3C55TOgUpQ23fxnYPpq2I=</code>
+      </div>
+    </div>
+    <div style="margin-top: 10px;">
+      <button id="announceBtn" disabled>📣 Announce in Lobby</button>
+      <button id="directConnectBtn" type="button">🔗 Direct Connect</button>
+      <span id="seekStatus" style="margin-left:8px;"></span>
+    </div>
+    <div style="margin-top: 10px;">
+      <h3>Games</h3>
+      <button id="seekChessBtn" disabled>Chess</button>
+    </div>
+    <div id="lobbyList">
+      <h3>Players in Lobby</h3>
+      <ul id="lobbyPlayers"></ul>
+    </div>
+  </div>
 
-  <script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
+  <div id="gameView" style="display:none;">
+    <div id="board"></div>
+    <div id="playerColorStatus"></div>
+    <div id="connectionAlert"></div>
+    <div id="gameStatus"></div>
+    <p><button id="resetBtn">Reset Game</button></p>
+  </div>
+  <p style="margin-top: 20px;">
+    <a href="https://github.com/compuvin/chess-meshtastic" target="_blank" rel="noopener" aria-label="GitHub repository" title="GitHub">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 98 96" width="24" height="24" aria-hidden="true">
+        <path fill="currentColor" d="M49 0C22.1 0 0 22.3 0 49.8c0 21.9 14.2 40.5 33.8 47.1 2.5.5 3.4-1.1 3.4-2.5 0-1.2-.1-5.3-.1-9.6-12.5 2.8-15.1-5.4-15.1-5.4-2-5.3-5-6.7-5-6.7-4.1-2.9.3-2.9.3-2.9 4.5.3 6.9 4.7 6.9 4.7 4 7 10.5 5 13.1 3.8.4-2.9 1.6-4.9 2.9-6-10-1.2-20.5-5.1-20.5-22.7 0-5 1.8-9.1 4.7-12.3-.5-1.2-2-6 0.4-12.6 0 0 3.8-1.2 12.4 4.7 3.6-1 7.4-1.5 11.2-1.5 3.8 0 7.6.5 11.2 1.5 8.6-5.9 12.4-4.7 12.4-4.7 2.4 6.6.9 11.4.4 12.6 2.9 3.2 4.7 7.3 4.7 12.3 0 17.7-10.5 21.5-20.5 22.7 1.6 1.4 3.1 4.1 3.1 8.3 0 6-.1 10.9-.1 12.4 0 1.4.9 3 3.4 2.5C83.8 90.3 98 71.7 98 49.8 98 22.3 75.9 0 49 0z"/>
+      </svg>
+    </a>
+  </p>
+
+  <script src="lib/jquery-1.12.4.min.js" onerror="loadCdnScript('https://code.jquery.com/jquery-1.12.4.min.js', this)"></script>
+  <script src="lib/chess.min.js" onerror="loadCdnScript('https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js', this)"></script>
+  <script src="lib/chessboard-1.0.0.min.js" onerror="loadCdnScript('https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js', this)"></script>
+  <script type="module">
+    import * as Meshtastic from "./js/meshtastic.js?v=2";
+    window.Meshtastic = Meshtastic;
+  </script>
   <script src="vendor/protobuf.min.js"></script>
 
   <script type="module">
@@ -44,6 +103,18 @@
 
     const $connectionStatus = $('#connectionStatus');
     const $gameStatus = $('#gameStatus');
+    const $playerColorStatus = $('#playerColorStatus');
+    const $connectionAlert = $('#connectionAlert');
+    const $lobbyStatus = $('#lobbyStatus');
+    const $lobbyQr = $('#lobbyQr');
+    const $announceBtn = $('#announceBtn');
+    const $directConnectBtn = $('#directConnectBtn');
+    const $seekChessBtn = $('#seekChessBtn');
+    const $seekStatus = $('#seekStatus');
+    const $lobbyPlayers = $('#lobbyPlayers');
+    const $lobbyView = $('#lobbyView');
+    const $gameView = $('#gameView');
+    const $opponentNodeWrap = $('#opponentNodeWrap');
 
     let board;
     let game = new Chess();
@@ -54,6 +125,25 @@
     let mySeed = null;
     let opponentSeed = null;
     let awaitingStart = false;
+    let iAmStarter = null;
+    let handshakeRetryId = null;
+    let handshakeRetries = 0;
+    let startAcked = false;
+    let startReceived = false;
+    const HANDSHAKE_RETRY_INTERVAL_MS = 30 * 1000;
+    const HANDSHAKE_RETRY_LIMIT = 6;
+    const LOBBY_CHANNEL_NAME = "GameLobby";
+    let lobbyChannelIndex = null;
+    let lobbyChannelSeen = false;
+    const lobbyPlayers = new Map();
+    let lobbyAnnounced = false;
+    let seekingChess = false;
+    let seekingTimeoutId = null;
+    let pendingInviteNode = null;
+    const LOBBY_STALE_MS = 15 * 60 * 1000;
+    let directConnectMode = false;
+    const knownShortNames = new Map();
+    let lobbyChannelTimerId = null;
     let moveCount = 0;
     let lastMoveUci = null;
     let moveTimeoutId = null;
@@ -71,6 +161,209 @@
       gameId,
       baudRate: 921600
     });
+    let bleConnection = null;
+
+    conn.onChannel((channel) => {
+      lobbyChannelSeen = true;
+      if (channel?.settings?.name === LOBBY_CHANNEL_NAME) {
+        lobbyChannelIndex = channel.index;
+      }
+      updateLobbyStatus();
+    });
+
+    conn.onNodeInfo((nodeInfo) => {
+      if (!nodeInfo?.num) return;
+      const nodeNum = nodeInfo.num;
+      const shortName = nodeInfo.user?.shortName || nodeInfo.user?.longName;
+      if (!shortName) return;
+      knownShortNames.set(shortName.toLowerCase(), nodeNum >>> 0);
+      if (lobbyPlayers.has(nodeNum)) {
+        upsertLobbyPlayer(nodeNum, shortName);
+      }
+    });
+
+    async function setupBleListeners(connection) {
+      connection.events.onMyNodeInfo.subscribe((data) => {
+        if (data?.myNodeNum != null) {
+          conn.myNodeNum = data.myNodeNum;
+          if (!conn.loggedMyNodeNum) {
+            console.log("[CHESS] myNodeNum:", conn.myNodeNum);
+            conn.loggedMyNodeNum = true;
+          }
+        }
+      });
+
+      connection.events.onNodeInfoPacket.subscribe((nodeInfo) => {
+        if (!nodeInfo?.num) return;
+        const nodeNum = nodeInfo.num;
+        const shortName = nodeInfo.user?.shortName || nodeInfo.user?.longName;
+        if (shortName) {
+          knownShortNames.set(shortName.toLowerCase(), nodeNum >>> 0);
+          if (lobbyPlayers.has(nodeNum)) {
+            upsertLobbyPlayer(nodeNum, shortName);
+          }
+          if (conn.myNodeNum != null && nodeNum === conn.myNodeNum) {
+            conn.myShortName = shortName;
+          }
+        }
+      });
+
+      connection.events.onChannelPacket.subscribe((channel) => {
+        lobbyChannelSeen = true;
+        const name = channel?.settings?.name || channel?.name;
+        console.log("[BLE] Channel:", channel?.index, name, channel);
+        if (name === LOBBY_CHANNEL_NAME) {
+          lobbyChannelIndex = channel.index;
+        }
+        updateLobbyStatus();
+      });
+
+      connection.events.onMeshPacket.subscribe((meshPacket) => {
+        const decoded = meshPacket?.payloadVariant?.value;
+        if (!decoded || !decoded.payload) return;
+        const rawText = new TextDecoder().decode(decoded.payload);
+        let parsed;
+        try {
+          parsed = JSON.parse(rawText);
+        } catch (_) {
+          return;
+        }
+        console.log("[CHESS RX]", parsed);
+        conn.onMoveCallback?.(parsed, { packet: meshPacket });
+      });
+    }
+
+    function patchBleConnection(connection) {
+      const originalRead = connection.readFromRadio?.bind(connection);
+      connection._bleOriginalRead = originalRead;
+      connection.readFromRadio = async function patchedReadFromRadio() {
+        const characteristic = this.fromRadioCharacteristic;
+        if (!characteristic) return;
+        if (characteristic.properties && !characteristic.properties.read) return;
+        if (!originalRead) return;
+        try {
+          await originalRead();
+        } catch (err) {
+          if (err?.name !== "NotSupportedError") {
+            console.warn("[BLE] readFromRadio error:", err);
+          }
+        }
+      };
+
+      connection.writeToRadio = async function patchedWriteToRadio(data) {
+        const characteristic = this.toRadioCharacteristic;
+        if (!characteristic) {
+          console.warn("[BLE] toRadio characteristic not available");
+          return;
+        }
+        const payload = new Uint8Array(data);
+        const canWrite = characteristic.properties?.write;
+        const canWriteNoResp = characteristic.properties?.writeWithoutResponse;
+        try {
+          if (canWrite || !canWriteNoResp) {
+            await characteristic.writeValue(payload);
+          } else if (canWriteNoResp) {
+            await characteristic.writeValueWithoutResponse(payload);
+          } else {
+            console.warn("[BLE] toRadio has no write capability");
+            return;
+          }
+        } catch (err) {
+          if (characteristic.writeValueWithoutResponse) {
+            await characteristic.writeValueWithoutResponse(payload);
+          } else {
+            throw err;
+          }
+        }
+        try {
+          await this.readFromRadio();
+        } catch (err) {
+          if (err?.name !== "NotSupportedError") {
+            console.warn("[BLE] readAfterWrite error:", err);
+          }
+        }
+      };
+
+      const proto = Object.getPrototypeOf(connection);
+      if (proto) {
+        proto.readFromRadio = connection.readFromRadio;
+        proto.writeToRadio = connection.writeToRadio;
+      }
+    }
+
+    async function enableBleNotifications(connection) {
+      const characteristic = connection.fromRadioCharacteristic;
+      if (!characteristic) return;
+      console.log("[BLE] fromRadio props:", characteristic.properties);
+      if (characteristic.properties?.notify || characteristic.properties?.indicate) {
+        try {
+          await characteristic.startNotifications();
+          characteristic.addEventListener("characteristicvaluechanged", (event) => {
+            const value = event.target?.value;
+            if (!value) return;
+            try {
+              connection.handleFromRadio(new Uint8Array(value.buffer));
+            } catch (err) {
+              console.warn("[BLE] notify parse error:", err);
+            }
+          });
+        } catch (err) {
+          console.warn("[BLE] notification setup error:", err);
+        }
+      }
+    }
+
+    async function waitForBleCharacteristics(connection, timeoutMs = 10000) {
+      const start = Date.now();
+      while (Date.now() - start < timeoutMs) {
+        if (connection.toRadioCharacteristic && connection.fromRadioCharacteristic) {
+          return true;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+      console.warn("[BLE] Characteristics not ready within timeout");
+      return false;
+    }
+
+    function logBleCharacteristicProps(connection) {
+      if (connection.toRadioCharacteristic) {
+        console.log("[BLE] toRadio props:", connection.toRadioCharacteristic.properties);
+      }
+      if (connection.fromRadioCharacteristic) {
+        console.log("[BLE] fromRadio props:", connection.fromRadioCharacteristic.properties);
+      }
+      if (connection.fromNumCharacteristic) {
+        console.log("[BLE] fromNum props:", connection.fromNumCharacteristic.properties);
+      }
+    }
+
+    function startLobbyChannelTimer() {
+      if (lobbyChannelTimerId) {
+        clearTimeout(lobbyChannelTimerId);
+      }
+      lobbyChannelTimerId = setTimeout(() => {
+        if (lobbyChannelIndex == null) {
+          lobbyChannelSeen = true;
+          updateLobbyStatus();
+        }
+      }, 5000);
+    }
+
+    async function sendBlePayload(payloadObj, options = {}) {
+      const { destination = 0xffffffff, channel = 0 } = options;
+      if (!bleConnection) return;
+      const portnum = conn.portnum ?? 1;
+      const payloadBytes = new TextEncoder().encode(JSON.stringify(payloadObj));
+      await bleConnection.sendPacket(
+        payloadBytes,
+        portnum,
+        destination,
+        channel,
+        true,
+        false
+      );
+      console.log("[CHESS TX]", payloadObj);
+    }
 
     // Chessboard config
     const cbConfig = {
@@ -84,30 +377,97 @@
     board = ChessBoard('board', cbConfig);
     updateStatus();
 
-    async function connect() {
+    async function connectSerial() {
       try {
         $connectionStatus.text("Status: 🟡 Connecting...");
+        resetLobbyState();
         await conn.connect();
         $connectionStatus.text("Status: 🟢 Connected & Ready");
-        $('#connectBtn').prop('disabled', true);
+        $('#connectSerialBtn').prop('disabled', true);
+        $('#connectBleBtn').prop('disabled', true);
         $('#disconnectBtn').prop('disabled', false);
-        startHandshake();
+        updateLobbyStatus();
+        startLobbyChannelTimer();
       } catch (e) {
         console.error("Connect failed:", e);
         $connectionStatus.text("Status: 🔴 Connection failed");
       }
     }
 
-    async function disconnect() {
-      await conn.disconnect();
-      $connectionStatus.text("Status: 🔴 Disconnected");
-      $('#connectBtn').prop('disabled', false);
-      $('#disconnectBtn').prop('disabled', true);
+    async function connectBluetooth() {
+      try {
+        if (!window.Meshtastic?.BleConnection || !window.Meshtastic?.Constants) {
+          throw new Error("Meshtastic BLE bundle not loaded.");
+        }
+        $connectionStatus.text("Status: 🟡 Connecting...");
+        resetLobbyState();
+        bleConnection = new window.Meshtastic.BleConnection();
+        patchBleConnection(bleConnection);
+        const originalConfigure = bleConnection.configure?.bind(bleConnection);
+        bleConnection.configure = async function patchedConfigure(...args) {
+          const ready = await waitForBleCharacteristics(this);
+          if (ready) {
+            logBleCharacteristicProps(this);
+            await enableBleNotifications(this);
+          }
+          if (!originalConfigure) return;
+          try {
+            return await originalConfigure(...args);
+          } catch (err) {
+            console.warn("[BLE] configure error:", err);
+          }
+        };
+        await setupBleListeners(bleConnection);
+        await bleConnection.connect({
+          deviceFilter: { filters: [{ services: [window.Meshtastic.Constants.ServiceUuid] }] }
+        });
+        const ready = await waitForBleCharacteristics(bleConnection);
+        if (ready) {
+          logBleCharacteristicProps(bleConnection);
+          await enableBleNotifications(bleConnection);
+        }
+        $connectionStatus.text("Status: 🟢 Connected & Ready");
+        $('#connectSerialBtn').prop('disabled', true);
+        $('#connectBleBtn').prop('disabled', true);
+        $('#disconnectBtn').prop('disabled', false);
+        updateLobbyStatus();
+        startLobbyChannelTimer();
+      } catch (e) {
+        console.error("Bluetooth connect failed:", e);
+        $connectionStatus.text("Status: 🔴 Connection failed");
+      }
     }
 
-    // -------------------- Sending & Receiving Moves --------------------
-    conn.onMove((moveMsg) => {
+    async function disconnect() {
+      if (bleConnection) {
+        try {
+          bleConnection.disconnect();
+        } catch (_) {}
+        bleConnection = null;
+      }
+      await conn.disconnect();
+      $connectionStatus.text("Status: 🔴 Disconnected");
+      $('#connectSerialBtn').prop('disabled', false);
+      $('#connectBleBtn').prop('disabled', false);
+      $('#disconnectBtn').prop('disabled', true);
+      resetLobbyState();
+      if (lobbyChannelTimerId) {
+        clearTimeout(lobbyChannelTimerId);
+        lobbyChannelTimerId = null;
+      }
+      $gameView.hide();
+      $lobbyView.show();
+    }
+
+    // -------------------- Sending & Receiving Messages --------------------
+    conn.onMove((moveMsg, rawMsg) => {
       if (!moveMsg || !moveMsg.t) return;
+      const packetChannel = rawMsg?.packet?.channel ?? 0;
+
+      if (packetChannel === lobbyChannelIndex) {
+        handleLobbyMessage(moveMsg, rawMsg);
+        return;
+      }
 
       if (moveMsg.t === "H") {
         handleHandshake(moveMsg);
@@ -115,6 +475,10 @@
       }
       if (moveMsg.t === "S") {
         handleStart(moveMsg);
+        return;
+      }
+      if (moveMsg.t === "K") {
+        handleStartAck(moveMsg);
         return;
       }
       if (moveMsg.t === "C") {
@@ -136,8 +500,21 @@
     });
 
     async function sendMove(payload) {
+      if (bleConnection) {
+        return sendBlePayload(payload, { destination: opponentNodeId ?? 0xffffffff, channel: 0 });
+      }
       if (!conn.connected) return console.warn("Not connected");
       await conn.sendMove(payload);
+    }
+
+    async function sendLobbyMessage(payload) {
+      if (bleConnection) {
+        if (lobbyChannelIndex == null) return console.warn("Lobby channel not ready");
+        return sendBlePayload(payload, { destination: 0xffffffff, channel: lobbyChannelIndex });
+      }
+      if (!conn.connected) return console.warn("Not connected");
+      if (lobbyChannelIndex == null) return console.warn("Lobby channel not ready");
+      await conn.sendPayload(payload, { destination: 0xffffffff, channel: lobbyChannelIndex });
     }
 
     // -------------------- Opponent Node ID --------------------
@@ -151,22 +528,224 @@
         resetHandshake();
         return;
       }
-      let parsed = null;
-      if (raw.startsWith('!')) {
-        parsed = parseInt(raw.slice(1), 16);
-      } else if (raw.startsWith('0x') || raw.startsWith('0X')) {
-        parsed = parseInt(raw.slice(2), 16);
-      } else {
-        parsed = parseInt(raw, 10);
-      }
-      if (Number.isFinite(parsed) && !Number.isNaN(parsed)) {
+      const parsed = resolveNodeId(raw);
+      if (parsed != null) {
         opponentNodeId = parsed >>> 0;
         conn.opponentNodeId = opponentNodeId;
         resetHandshake();
       } else {
-        console.warn("Invalid opponent node id:", raw);
+        console.warn("Invalid opponent node id or name:", raw);
       }
     });
+
+    // -------------------- Lobby --------------------
+    function formatNodeNum(nodeNum) {
+      if (nodeNum == null) return "unknown";
+      return `0x${(nodeNum >>> 0).toString(16)}`;
+    }
+
+    function resolveNodeId(raw) {
+      if (!raw) return null;
+      if (raw.startsWith('!')) {
+        const parsed = parseInt(raw.slice(1), 16);
+        return Number.isFinite(parsed) ? parsed >>> 0 : null;
+      }
+      if (raw.startsWith('0x') || raw.startsWith('0X')) {
+        const parsed = parseInt(raw.slice(2), 16);
+        return Number.isFinite(parsed) ? parsed >>> 0 : null;
+      }
+      const asDecimal = parseInt(raw, 10);
+      if (Number.isFinite(asDecimal) && !Number.isNaN(asDecimal)) {
+        return asDecimal >>> 0;
+      }
+      const needle = raw.toLowerCase();
+      if (knownShortNames.has(needle)) {
+        return knownShortNames.get(needle) >>> 0;
+      }
+      for (const entry of lobbyPlayers.values()) {
+        if (entry.name && entry.name.toLowerCase() === needle) {
+          return entry.nodeNum >>> 0;
+        }
+      }
+      return null;
+    }
+
+    function getMyLobbyName() {
+      if (conn.myShortName) return conn.myShortName;
+      if (conn.myNodeNum != null) {
+        for (const [name, num] of knownShortNames.entries()) {
+          if ((num >>> 0) === (conn.myNodeNum >>> 0)) {
+            return name;
+          }
+        }
+        return formatNodeNum(conn.myNodeNum);
+      }
+      return "Unknown";
+    }
+
+    function updateLobbyStatus() {
+      const isConnected = conn.connected || !!bleConnection;
+      if (!isConnected) {
+        $lobbyStatus.text("Lobby: disconnected");
+        $announceBtn.prop('disabled', true);
+        $seekChessBtn.prop('disabled', true);
+        $lobbyQr.hide();
+        return;
+      }
+      if (lobbyChannelIndex != null) {
+        $lobbyStatus.text(`Lobby channel found: ${LOBBY_CHANNEL_NAME} (index ${lobbyChannelIndex})`);
+        $announceBtn.prop('disabled', false);
+        $seekChessBtn.prop('disabled', false);
+        $lobbyQr.hide();
+        if (!lobbyAnnounced) {
+          announceLobbyPresence();
+          lobbyAnnounced = true;
+        }
+        upsertLobbyPlayer(conn.myNodeNum, getMyLobbyName());
+        return;
+      }
+      $lobbyStatus.text(`Lobby channel not found: ${LOBBY_CHANNEL_NAME}`);
+      $announceBtn.prop('disabled', true);
+      $seekChessBtn.prop('disabled', !directConnectMode);
+      if (lobbyChannelSeen) {
+        $lobbyQr.show();
+      }
+    }
+
+    function resetLobbyState() {
+      lobbyChannelIndex = null;
+      lobbyChannelSeen = false;
+      lobbyAnnounced = false;
+      pendingInviteNode = null;
+      directConnectMode = false;
+      $opponentNodeWrap.hide();
+      lobbyPlayers.clear();
+      renderLobbyPlayers();
+      stopSeekingChess();
+      updateLobbyStatus();
+    }
+
+    function upsertLobbyPlayer(nodeNum, name) {
+      const existing = lobbyPlayers.get(nodeNum) || { nodeNum };
+      existing.name = name || existing.name;
+      existing.lastSeen = Date.now();
+      lobbyPlayers.set(nodeNum, existing);
+      renderLobbyPlayers();
+    }
+
+    function renderLobbyPlayers() {
+      $lobbyPlayers.empty();
+      const entries = Array.from(lobbyPlayers.values())
+        .sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0));
+      const now = Date.now();
+      for (const entry of entries) {
+        const name = entry.name || formatNodeNum(entry.nodeNum);
+        const $li = $('<li></li>');
+        if (entry.lastSeen && now - entry.lastSeen > LOBBY_STALE_MS) {
+          $li.addClass('inactive');
+        }
+        const $label = $('<span></span>').text(name);
+        const $btn = $('<button type="button">Invite</button>');
+        if (entry.nodeNum === conn.myNodeNum) {
+          $btn.prop('disabled', true);
+        }
+        $btn.on('click', () => {
+          pendingInviteNode = entry.nodeNum;
+          sendLobbyMessage({ t: "I", to: entry.nodeNum, game: "chess" });
+        });
+        $li.append($label);
+        $li.append($btn);
+        $lobbyPlayers.append($li);
+      }
+    }
+
+    function announceLobbyPresence() {
+      sendLobbyMessage({ t: "L", n: getMyLobbyName(), id: conn.myNodeNum, m: `${getMyLobbyName()} is in the lobby` });
+      upsertLobbyPlayer(conn.myNodeNum, getMyLobbyName());
+    }
+
+    function startSeekingChess() {
+      if (seekingChess) return;
+      if (directConnectMode && opponentNodeId != null) {
+        startGameWith(opponentNodeId);
+        return;
+      }
+      seekingChess = true;
+      $seekStatus.text("Looking for chess...");
+      sendLobbyMessage({
+        t: "G",
+        game: "chess",
+        n: getMyLobbyName(),
+        m: `${getMyLobbyName()} would like to play chess`
+      });
+      if (seekingTimeoutId) clearTimeout(seekingTimeoutId);
+      seekingTimeoutId = setTimeout(() => {
+        seekingChess = false;
+        $seekStatus.text("No response. Try again.");
+      }, 60 * 1000);
+    }
+
+    function stopSeekingChess() {
+      seekingChess = false;
+      if (seekingTimeoutId) {
+        clearTimeout(seekingTimeoutId);
+        seekingTimeoutId = null;
+      }
+      $seekStatus.text("");
+    }
+
+    function handleLobbyMessage(msg, rawMsg) {
+      const from = rawMsg?.packet?.from ?? msg.from ?? msg.id;
+      if (from == null) return;
+      if (from === conn.myNodeNum) return;
+      const target = typeof msg.to === 'number' ? (msg.to >>> 0) : null;
+      const myNodeNum = conn.myNodeNum != null ? (conn.myNodeNum >>> 0) : null;
+      if (msg.n) {
+        upsertLobbyPlayer(from, msg.n);
+      }
+
+      if (msg.t === "L") {
+        upsertLobbyPlayer(from, msg.n);
+        return;
+      }
+
+      if (msg.t === "G" && msg.game === "chess") {
+        if (seekingChess) {
+          stopSeekingChess();
+          sendLobbyMessage({ t: "A", to: from, game: "chess" });
+          startGameWith(from);
+        }
+        return;
+      }
+
+      if (msg.t === "I" && msg.game === "chess" && target != null && target === myNodeNum) {
+        sendLobbyMessage({ t: "A", to: from, game: "chess" });
+        startGameWith(from);
+        return;
+      }
+
+      if (msg.t === "A" && msg.game === "chess" && target != null && target === myNodeNum) {
+        if (pendingInviteNode === from || seekingChess) {
+          stopSeekingChess();
+          pendingInviteNode = null;
+          startGameWith(from);
+        }
+      }
+    }
+
+    function startGameWith(nodeNum) {
+      opponentNodeId = nodeNum >>> 0;
+      conn.opponentNodeId = opponentNodeId;
+      $opponentNodeId.val(formatNodeNum(opponentNodeId));
+      stopSeekingChess();
+      pendingInviteNode = null;
+      $lobbyView.hide();
+      $gameView.show();
+      game = new Chess();
+      board.position('start');
+      resetHandshake();
+      startHandshake();
+    }
 
     // -------------------- Handshake --------------------
     function resetHandshake() {
@@ -177,16 +756,20 @@
       gameStarted = false;
       localPlayerColor = null;
       awaitingStart = false;
+      iAmStarter = null;
+      startAcked = false;
+      startReceived = false;
+      stopHandshakeRetryLoop();
       moveCount = 0;
       lastMoveUci = null;
       clearMoveTimers();
       clearConnectionAlert();
-      $('#playerColorStatus').text("");
+      $playerColorStatus.text("");
       updateStatus();
     }
 
     function startHandshake() {
-      if (!conn.connected) return;
+      if (!conn.connected && !bleConnection) return;
       if (opponentNodeId == null) {
         console.warn("Opponent node id required to start.");
         return;
@@ -194,6 +777,7 @@
       if (mySeed != null) return;
       mySeed = (Math.random() * 0xffffffff) >>> 0;
       sendMove({ t: "H", s: mySeed });
+      startHandshakeRetryLoop();
       updateStatus();
     }
 
@@ -216,28 +800,96 @@
         iAmWhite = conn.myNodeNum > opponentNodeId;
       }
 
+      iAmStarter = iAmWhite;
       localPlayerColor = iAmWhite ? 'w' : 'b';
-      $('#playerColorStatus').text(`You are ${iAmWhite ? 'White' : 'Black'}.`);
+      $playerColorStatus.text(`You are ${iAmWhite ? 'White' : 'Black'}.`);
 
       if (seedDiff >= 0 && !awaitingStart) {
+        startGameIdAnnouncement();
+      }
+      updateStatus();
+    }
+
+    function startGameIdAnnouncement() {
+      if (gameId == null) {
         gameId = (Math.random() * 0xffffffff) >>> 0;
         conn.gameId = gameId;
-        awaitingStart = true;
-        sendMove({ t: "S", g: gameId });
-        gameStarted = true;
-        updateStatus();
-      } else {
-        updateStatus();
       }
+      awaitingStart = true;
+      sendMove({ t: "S", g: gameId });
+      gameStarted = true;
     }
 
     function handleStart(msg) {
       if (typeof msg.g !== 'number') return;
-      gameId = msg.g >>> 0;
-      conn.gameId = gameId;
+      const incomingGameId = msg.g >>> 0;
+      if (gameStarted && gameId != null && gameId !== incomingGameId && moveCount > 0) {
+        console.warn("Ignoring start for different game id:", incomingGameId, "current:", gameId);
+        return;
+      }
+      if (gameId == null || gameId !== incomingGameId) {
+        if (gameId != null && gameId !== incomingGameId) {
+          console.warn("Overriding game id:", gameId, "->", incomingGameId);
+        }
+        gameId = incomingGameId;
+        conn.gameId = gameId;
+      }
+      if (iAmStarter == null) {
+        iAmStarter = false;
+      }
+      startReceived = true;
       gameStarted = true;
       awaitingStart = true;
+      sendMove({ t: "K", g: gameId });
+      if (iAmStarter === false) {
+        startAcked = true;
+      }
+      if (iAmStarter === false) {
+        stopHandshakeRetryLoop();
+      }
       updateStatus();
+    }
+
+    function handleStartAck(msg) {
+      if (typeof msg.g !== 'number') return;
+      const ackGameId = msg.g >>> 0;
+      if (gameId == null || ackGameId !== gameId) return;
+      startAcked = true;
+      updateStatus();
+      if (iAmStarter === true) {
+        stopHandshakeRetryLoop();
+      }
+    }
+
+    function startHandshakeRetryLoop() {
+      stopHandshakeRetryLoop();
+      handshakeRetries = 0;
+      handshakeRetryId = setInterval(() => {
+        handshakeRetries += 1;
+        if (handshakeRetries > HANDSHAKE_RETRY_LIMIT) {
+          stopHandshakeRetryLoop();
+          return;
+        }
+        if (mySeed == null) {
+          mySeed = (Math.random() * 0xffffffff) >>> 0;
+          sendMove({ t: "H", s: mySeed });
+          return;
+        }
+        if (!startReceived || opponentSeed == null) {
+          sendMove({ t: "H", s: mySeed });
+        }
+        const seedDiff = (mySeed >>> 0) - (opponentSeed >>> 0);
+        if (seedDiff >= 0 && !startAcked) {
+          startGameIdAnnouncement();
+        }
+      }, HANDSHAKE_RETRY_INTERVAL_MS);
+    }
+
+    function stopHandshakeRetryLoop() {
+      if (handshakeRetryId) {
+        clearInterval(handshakeRetryId);
+        handshakeRetryId = null;
+      }
     }
 
     function scheduleMoveTimeout() {
@@ -312,17 +964,18 @@
     }
 
     function showConnectionAlert(text) {
-      $('#connectionAlert').text(text);
+      $connectionAlert.text(text);
     }
 
     function clearConnectionAlert() {
-      $('#connectionAlert').text("");
+      $connectionAlert.text("");
     }
 
     // -------------------- Chess Events --------------------
     function onDragStart(source, piece) {
-      if (game.game_over() || !gameStarted || !conn.connected) return false;
+      if (game.game_over() || !gameStarted || (!conn.connected && !bleConnection)) return false;
       if (localPlayerColor == null) return false;
+      if (localPlayerColor === 'w' && !startAcked) return false;
       if (game.turn() !== localPlayerColor) return false;
       if ((game.turn() === 'w' && piece.search(/^b/) !== -1) ||
           (game.turn() === 'b' && piece.search(/^w/) !== -1)) {
@@ -375,9 +1028,25 @@
     }
 
     // -------------------- Event Binding --------------------
-    $('#connectBtn').on('click', connect);
+    $('#connectSerialBtn').on('click', connectSerial);
+    $('#connectBleBtn').on('click', connectBluetooth);
     $('#disconnectBtn').on('click', disconnect);
     $('#resetBtn').on('click', resetGame);
+    $directConnectBtn.on('click', () => {
+      directConnectMode = !directConnectMode;
+      if (directConnectMode) {
+        $opponentNodeWrap.show();
+        $seekStatus.text("Enter a node ID, then click Chess to start.");
+        updateLobbyStatus();
+      } else {
+        $opponentNodeWrap.hide();
+        $seekStatus.text("");
+        updateLobbyStatus();
+      }
+    });
+    $announceBtn.on('click', announceLobbyPresence);
+    $seekChessBtn.on('click', startSeekingChess);
+    updateLobbyStatus();
     updateStatus();
   </script>
 </body>
